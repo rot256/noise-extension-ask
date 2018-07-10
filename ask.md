@@ -33,11 +33,6 @@ Examples include:
 
 # 2. Overview
 
-This section should give a brief overview of how your extension works.
-
-Introduce new terms in **bold**.  Use internal references such as [Section
-1](#introduction).  Use bibliographic references such as [@hkdfpaper], [@kudla2005], [@rfc5869] that refer to bibtex entries in either the `spectools/*.bib` files or the local `my.bib` file.
-
 The Additional Symmetric Keys API is centered around labels and chains:
 **labels** are arbitrary byte strings,
 each label allows the construction of a **chain** based on the value of the label and
@@ -59,13 +54,9 @@ the API exposed by this extension consists of 3 methods:
   appropriate chain, and advances the appropriate ASK chain key, deleting the
   previous chain key.
 
-# 3. Implementation
+# 3. Security considerations
 
-
-
-# 4. Security considerations
-
-The Additional Symmetric Keys extension is design to meet the following goals:
+The Additional Symmetric Keys extension is design to meet the following security goals:
 
 * The ASKs should be independent from the Noise chaining key.
   Recovering knowledge about the Noise chaining key from any number of ASK
@@ -77,6 +68,10 @@ The Additional Symmetric Keys extension is design to meet the following goals:
 * ASKs should be capable of serving as collision-resistant hashes of the session transcript
   at the security level expected by the employed hash function (256/512-bit).
 
+# 4. Design
+
+In addition to the security goals stated above, the extension seeks to meet the following design goals:
+
 * The mechanism should not be restricted to using the output key-material
   for particular purposes (e.g. the use cases listed above).
 
@@ -84,9 +79,9 @@ The Additional Symmetric Keys extension is design to meet the following goals:
   This allows libraries to implement the extension without introducing significant
   overhead on applications not using the ASK API.
 
-# 6. Rationales
+# 5. Implementation
 
-Not required, but might be a good idea to explain nonobvious design decisions.
+# 6. Rationales
 
 Rather than truncating to 32 bytes (size of a symmetric key),
 full output of HKDF is returned (rathe
