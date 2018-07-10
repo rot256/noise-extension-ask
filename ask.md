@@ -2,7 +2,6 @@
 title:      'Additional Symmetric Keys'
 author:
  - Mathias hall-Andersen (mathias@hall-andersen.dk)
- - Second Author (second@email)
 revision:   '1'
 status:     'unofficial/unstable'
 date:       '2018-07-09'
@@ -18,9 +17,6 @@ Examples include:
 * Resumption PSKs - Deriving a "resumption PSK" from an initial Noise session.
   The resumption PSK can be used to perform a PSK Noise handshake later.
   ASK can also be used to derive associated data, such as labels to identify PSKs.
-
-* Used to enable 0-RTT with patterns not normally permitting encryption
-  in the first message (e.g. XX pattern), by combining ASK with a psk modifier.
 
 * Deriving keys used to generate random padding or other
   length-hiding / traffic-hiding countermeasures,
@@ -81,16 +77,41 @@ In addition to the security goals stated above, the extension seeks to meet the 
 
 # 5. Implementation
 
-# 6. Rationales
+Implementation of ASK uses HKDF [@rfc5869]
+and augments the operation of **MixKey** and **MixKeyAndHash** to extract **ask_master**
+which is used to generate the chains:
+immediately before any call to either **MixKey** or **MixKeyAndHash**, if `ask_enable` is set, compute
+`ask_master = HKDF(ck, ikm, info="ask", 1)`.
 
-Rather than truncating to 32 bytes (size of a symmetric key),
-full output of HKDF is returned (rathe
+The API is then implemented as follows:
 
-# 7. IPR
+* **EnableASK(labels)**:
+
+    * Set `ask_enable = true`
+
+* **InitializeASK(labels)**:
+
+    * Set `ask_chains = {}` (the empty mapping)
+    * If `ask_master` is empty: \
+      return an appropriate error.
+    * For each label in labels, set: \
+      `ask_chains[label] = HKDF(ask_master, h || label)`
+    * Erase `ask_master`
+
+* **GetAsk(label)**:
+
+    * If `ask_chains` does not contain `label`: \
+      return an appropriate error.
+    * `ask_ck = ask_chains[label]`
+    * `temp_k1, temp_k2 = HKDF(ask_ck, zerolen)`
+    * `ask_chains[label] = temp_k1`
+    * `return temp_k2`
+
+# 6. IPR
 
 This document is hereby placed in the public domain.
 
-# 8. Acknowledgements
+# 7. Acknowledgements
 
 This extension is based on the "Resumption PSKs" discussion between:
 
@@ -102,4 +123,4 @@ This extension is based on the "Resumption PSKs" discussion between:
 And in particular the [ASK proposal outlined by Trevor Perrin](https://moderncrypto.org/mail-archive/noise/2018/001713.html).
 From which both terminology and implementation details has been lifted into this document.
 
-# 9.  References
+# 8.  References
