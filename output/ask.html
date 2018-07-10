@@ -1,0 +1,91 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <meta name="author" content="Mathias hall-Andersen (mathias@hall-andersen.dk)" />
+  <meta name="author" content="Second Author (second@email)" />
+  <meta name="date" content="2018-07-09" />
+  <title>Additional Symmetric Keys</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <link rel="stylesheet" href="spec_markdown.css" type="text/css" />
+</head>
+<body>
+<div id="header">
+<h1 class="title">Additional Symmetric Keys</h1>
+<b>Author:</b> Mathias hall-Andersen (mathias@hall-andersen.dk)<br/>
+<b>Author:</b> Second Author (second@email)<br/>
+<b>Revision:</b> 1<br/>
+<b>Date:</b> 2018-07-09<br/>
+<b>Status:</b> unofficial/unstable<br/>
+<b>PDF:</b> <a href="ask.pdf">ask.pdf</a><br/>
+</div>
+<div id="TOC">
+<h2 class="toc">Table of Contents</h2>
+<ul>
+<li><a href="#introduction">1. Introduction</a></li>
+<li><a href="#overview">2. Overview</a></li>
+<li><a href="#implementation">3. Implementation</a></li>
+<li><a href="#security-considerations">4. Security considerations</a></li>
+<li><a href="#rationales">6. Rationales</a></li>
+<li><a href="#ipr">7. IPR</a></li>
+<li><a href="#acknowledgements">8. Acknowledgements</a></li>
+<li><a href="#references">9. References</a></li>
+</ul>
+</div>
+<h1 id="introduction">1. Introduction</h1>
+<p>This extension is intended for applications wishing to use key material derived by Noise for auxiliary purposes or other extensions of Noise. Examples include:</p>
+<ul>
+<li><p>Resumption PSKs - Deriving a &quot;resumption PSK&quot; from an initial Noise session. The resumption PSK can be used to perform a PSK Noise handshake later. ASK can also be used to derive associated data, such as labels to identify PSKs.</p></li>
+<li><p>Used to enable 0-RTT with patterns not normally permitting encryption in the first message (e.g. XX pattern), by combining ASK with a psk modifier.</p></li>
+<li><p>Deriving keys used to generate random padding or other length-hiding / traffic-hiding countermeasures, include the derivation of obfuscation keys used to discourage middle boxes from parsing fields inside messages.</p></li>
+<li><p>Generate application-layer keys in case the Noise handshake is being used as the handshake / key-establishment component within a larger secure transport layer protocol.</p></li>
+</ul>
+<h1 id="overview">2. Overview</h1>
+<p>This section should give a brief overview of how your extension works.</p>
+<p>Introduce new terms in <strong>bold</strong>. Use internal references such as <a href="#introduction">Section 1</a>. Use bibliographic references such as <span class="citation">[<a href="#ref-hkdfpaper">1</a>]</span>, <span class="citation">[<a href="#ref-kudla2005">2</a>]</span>, <span class="citation">[<a href="#ref-rfc5869">3</a>]</span> that refer to bibtex entries in either the <code>spectools/*.bib</code> files or the local <code>my.bib</code> file.</p>
+<p>The Additional Symmetric Keys API is centered around labels and chains: <strong>labels</strong> are arbitrary byte strings, each label allows the construction of a <strong>chain</strong> based on the value of the label and the current SymmetricState value. Each chain can then be <strong>invoked</strong> any number of times to generate a arbitrary amount of key material, the API exposed by this extension consists of 3 methods:</p>
+<ul>
+<li><p><strong>EnableASK()</strong>: Enables ASK, by setting a boolean <code>ask_enable = true</code>, which causes ASK master keys to be derived.</p></li>
+<li><p><strong>InitializeASK(labels)</strong>: If ASK is enabled and an non-empty ASK master key is available, the function makes a set of labels and initializes a chain for each label. This method can be called multiple times, both during and after the handshake and replaces any previous ASK chains when called.</p></li>
+<li><p><strong>GetASK(label)</strong>: Assuming ASK is enabled and initialized, returns the next key from the appropriate chain, and advances the appropriate ASK chain key, deleting the previous chain key.</p></li>
+</ul>
+<h1 id="implementation">3. Implementation</h1>
+<h1 id="security-considerations">4. Security considerations</h1>
+<p>The Additional Symmetric Keys extension is design to meet the following goals:</p>
+<ul>
+<li><p>The ASKs should be independent from the Noise chaining key. Recovering knowledge about the Noise chaining key from any number of ASK outputs must be infeasible.</p></li>
+<li><p>The ASKs should be mutual independent; deriving any of the ASK outputs from any other should be infeasible.</p></li>
+<li><p>ASKs should be capable of serving as collision-resistant hashes of the session transcript at the security level expected by the employed hash function (256/512-bit).</p></li>
+<li><p>The mechanism should not be restricted to using the output key-material for particular purposes (e.g. the use cases listed above).</p></li>
+<li><p>When not enabled, the ASK mechanism should incur no additional computational cost. This allows libraries to implement the extension without introducing significant overhead on applications not using the ASK API.</p></li>
+</ul>
+<h1 id="rationales">6. Rationales</h1>
+<p>Not required, but might be a good idea to explain nonobvious design decisions.</p>
+<p>Rather than truncating to 32 bytes (size of a symmetric key), full output of HKDF is returned (rathe</p>
+<h1 id="ipr">7. IPR</h1>
+<p>This document is hereby placed in the public domain.</p>
+<h1 id="acknowledgements">8. Acknowledgements</h1>
+<p>This extension is based on the &quot;Resumption PSKs&quot; discussion between:</p>
+<ul>
+<li>str4d (str4d@i2pmail.org)</li>
+<li>Trevor Perrin (trevp@trevp.net)</li>
+<li>Christopher Wood (christopherwood07@gmail.com)</li>
+<li>David Wong (davidwong.crypto@gmail.com)</li>
+</ul>
+<p>And in particular the <a href="https://moderncrypto.org/mail-archive/noise/2018/001713.html">ASK proposal outlined by Trevor Perrin</a>. From which both terminology and implementation details has been lifted into this document.</p>
+<h1 id="references" class="unnumbered">9. References</h1>
+<div id="refs" class="references">
+<div id="ref-hkdfpaper">
+<p>[1] H. Krawczyk, “‘Cryptographic extraction and key derivation: The hkdf scheme’.” Cryptology ePrint Archive, Report 2010/264, 2010. <a href="http://eprint.iacr.org/2010/264" class="uri">http://eprint.iacr.org/2010/264</a></p>
+</div>
+<div id="ref-kudla2005">
+<p>[2] C. Kudla and K. G. Paterson, “Modular Security Proofs for Key Agreement Protocols,” in Advances in Cryptology - ASIACRYPT 2005: 11th International Conference on the Theory and Application of Cryptology and Information Security, 2005. <a href="http://www.isg.rhul.ac.uk/~kp/ModularProofs.pdf" class="uri">http://www.isg.rhul.ac.uk/~kp/ModularProofs.pdf</a></p>
+</div>
+<div id="ref-rfc5869">
+<p>[3] H. Krawczyk and P. Eronen, “HMAC-based Extract-and-Expand Key Derivation Function (HKDF).” Internet Engineering Task Force; RFC 5869 (Informational); IETF, May-2010. <a href="http://www.ietf.org/rfc/rfc5869.txt" class="uri">http://www.ietf.org/rfc/rfc5869.txt</a></p>
+</div>
+</div>
+</body>
+</html>
