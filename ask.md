@@ -4,7 +4,7 @@ author:
  - Mathias hall-Andersen (mathias@hall-andersen.dk)
 revision:   '1'
 status:     'unofficial/unstable'
-date:       '2018-07-09'
+date:       '2018-07-11'
 link-citations: 'true'
 ---
 
@@ -32,23 +32,17 @@ Examples include:
 The Additional Symmetric Keys API is centered around labels and chains:
 **labels** are arbitrary byte strings,
 each label allows the construction of a **chain** based on the value of the label and
-the current SymmetricState value.
-Each chain can then be **invoked** any number of times to generate a arbitrary amount of key material,
-the API exposed by this extension consists of 3 methods:
+the current `SymmetricState` value.
+An arbitrary amount of key material can be extracted from every chain.
+The API consists of 2 methods:
 
-* **EnableASK()**: Enables ASK, by setting a boolean `ask_enable = true`,
-  which causes ASK master keys to be derived.
-
-* **InitializeASK(labels)**:
-  If ASK is enabled and an non-empty ASK master key is available,
-  the function makes a set of labels and initializes a chain for each label.
-  This method can be called multiple times, both during and after the handshake
-  and replaces any previous ASK chains when called.
+* **InitASK(label)**:
+  Initializes a chain for the given label.
 
 * **GetASK(label)**:
-  Assuming ASK is enabled and initialized, returns the next key from the
-  appropriate chain, and advances the appropriate ASK chain key, deleting the
-  previous chain key.
+  Assuming that a chain has been initialized for the label
+  this method returns the next key from the appropriate chain
+  and advances the chain to enable forward secrecy for ASK outputs.
 
 # 3. Security considerations
 
@@ -61,8 +55,10 @@ The Additional Symmetric Keys extension is design to meet the following security
 * The ASKs should be mutual independent;
   deriving any of the ASK outputs from any other should be infeasible.
 
-* ASKs should be capable of serving as collision-resistant hashes of the session transcript
+* ASKs output should be capable of serving as collision resistant hashes of the session transcript
   at the security level expected by the employed hash function (256/512-bit).
+  Since the GetASK method only outputs 256-bit, we require that the concatenation of two GetASK outputs
+  (from the same or distinct chains) offer the same level of collision resistance as the underlying hash function.
 
 # 4. Design
 
@@ -71,47 +67,50 @@ In addition to the security goals stated above, the extension seeks to meet the 
 * The mechanism should not be restricted to using the output key-material
   for particular purposes (e.g. the use cases listed above).
 
-* When not enabled, the ASK mechanism should incur no additional computational cost.
+* When not used, the ASK mechanism should incur any significant additional computational cost.
   This allows libraries to implement the extension without introducing significant
-  overhead on applications not using the ASK API.
+  overhead on applications not using this extension.
 
 # 5. Implementation
 
 Implementation of ASK uses HKDF [@rfc5869]
-and augments the operation of **MixKey** and **MixKeyAndHash** to extract **ask_master**
-which is used to generate the chains:
-immediately before any call to either **MixKey** or **MixKeyAndHash**, if `ask_enable` is set, compute
-`ask_master = HKDF(ck, ikm, info="ask", 1)`.
+and augments the operation of **MixKey**, **MixHash** and **MixKeyAndHash**
+by clearing the chains whenever the `SymmetricState` object are updated:
+after any call to either **MixKey**, **MixHash** or **MixKeyAndHash**,
+set `ask_chains = {}` (empty mapping).
 
-The API is then implemented as follows:
+The API is implemented as follows:
 
-* **EnableASK(labels)**:
+* **InitASK(label)**:
+    * If `ask_chains` contains `label`: \
+      Return an appropriate error
+    * Set `ask_chains[label] = HKDF(ck, h || label, info="ask")`
+    * Return `tmp_k2`
 
-    * Set `ask_enable = true`
-
-* **InitializeASK(labels)**:
-
-    * Set `ask_chains = {}` (the empty mapping)
-    * If `ask_master` is empty: \
-      return an appropriate error.
-    * For each label in labels, set: \
-      `ask_chains[label] = HKDF(ask_master, h || label)`
-    * Erase `ask_master`
-
-* **GetAsk(label)**:
+* **GetASK(label)**:
 
     * If `ask_chains` does not contain `label`: \
-      return an appropriate error.
-    * `ask_ck = ask_chains[label]`
-    * `temp_k1, temp_k2 = HKDF(ask_ck, zerolen)`
-    * `ask_chains[label] = temp_k1`
-    * `return temp_k2`
+      Return an appropriate error
+    * Let `ask_ck = ask_chains[label]`
+    * Let `temp_k1, temp_k2 = HKDF(ask_ck, zerolen, 2)`
+    * Set `ask_chains[label] = temp_k1`
+    * Return `temp_k2[..32]`, the first 32-bytes of `temp_k2`.
 
-# 6. IPR
+# 6. Rational
+
+Although `GetASK(label)` and `InitASK(label)` could be combined,
+these are kept separate to enable the common use case where a chain is initialized
+before a `Split()` call (when `ck` is still available) and used
+after the `CipherState` objects have been instantiated.
+
+The output of `GetASK` is truncated to 32 bytes to ensure
+that the API has the same behavior regardless of which hash function is employed.
+
+# 7. IPR
 
 This document is hereby placed in the public domain.
 
-# 7. Acknowledgements
+# 8. Acknowledgements
 
 This extension is based on the "Resumption PSKs" discussion between:
 
@@ -120,7 +119,7 @@ This extension is based on the "Resumption PSKs" discussion between:
 - Christopher Wood (christopherwood07@gmail.com)
 - David Wong (davidwong.crypto@gmail.com)
 
-And in particular the [ASK proposal outlined by Trevor Perrin](https://moderncrypto.org/mail-archive/noise/2018/001713.html).
-From which both terminology and implementation details has been lifted into this document.
+And in particular the ASK proposal outlined by Trevor Perrin
+from which both terminology and implementation details has been lifted into this document.
 
-# 8.  References
+# 9.  References

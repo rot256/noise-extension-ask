@@ -5,8 +5,7 @@
   <meta http-equiv="Content-Style-Type" content="text/css" />
   <meta name="generator" content="pandoc" />
   <meta name="author" content="Mathias hall-Andersen (mathias@hall-andersen.dk)" />
-  <meta name="author" content="Second Author (second@email)" />
-  <meta name="date" content="2018-07-09" />
+  <meta name="date" content="2018-07-11" />
   <title>Additional Symmetric Keys</title>
   <style type="text/css">code{white-space: pre;}</style>
   <link rel="stylesheet" href="spec_markdown.css" type="text/css" />
@@ -15,9 +14,8 @@
 <div id="header">
 <h1 class="title">Additional Symmetric Keys</h1>
 <b>Author:</b> Mathias hall-Andersen (mathias@hall-andersen.dk)<br/>
-<b>Author:</b> Second Author (second@email)<br/>
 <b>Revision:</b> 1<br/>
-<b>Date:</b> 2018-07-09<br/>
+<b>Date:</b> 2018-07-11<br/>
 <b>Status:</b> unofficial/unstable<br/>
 <b>PDF:</b> <a href="ask.pdf">ask.pdf</a><br/>
 </div>
@@ -29,9 +27,10 @@
 <li><a href="#security-considerations">3. Security considerations</a></li>
 <li><a href="#design">4. Design</a></li>
 <li><a href="#implementation">5. Implementation</a></li>
-<li><a href="#ipr">6. IPR</a></li>
-<li><a href="#acknowledgements">7. Acknowledgements</a></li>
-<li><a href="#references">8. References</a></li>
+<li><a href="#rational">6. Rational</a></li>
+<li><a href="#ipr">7. IPR</a></li>
+<li><a href="#acknowledgements">8. Acknowledgements</a></li>
+<li><a href="#references">9. References</a></li>
 </ul>
 </div>
 <h1 id="introduction">1. Introduction</h1>
@@ -42,29 +41,51 @@
 <li><p>Generate application-layer keys in case the Noise handshake is being used as the handshake / key-establishment component within a larger secure transport layer protocol.</p></li>
 </ul>
 <h1 id="overview">2. Overview</h1>
-<p>The Additional Symmetric Keys API is centered around labels and chains: <strong>labels</strong> are arbitrary byte strings, each label allows the construction of a <strong>chain</strong> based on the value of the label and the current SymmetricState value. Each chain can then be <strong>invoked</strong> any number of times to generate a arbitrary amount of key material, the API exposed by this extension consists of 3 methods:</p>
+<p>The Additional Symmetric Keys API is centered around labels and chains: <strong>labels</strong> are arbitrary byte strings, each label allows the construction of a <strong>chain</strong> based on the value of the label and the current <code>SymmetricState</code> value. An arbitrary amount of key material can be extracted from every chain. The API consists of 2 methods:</p>
 <ul>
-<li><p><strong>EnableASK()</strong>: Enables ASK, by setting a boolean <code>ask_enable = true</code>, which causes ASK master keys to be derived.</p></li>
-<li><p><strong>InitializeASK(labels)</strong>: If ASK is enabled and an non-empty ASK master key is available, the function makes a set of labels and initializes a chain for each label. This method can be called multiple times, both during and after the handshake and replaces any previous ASK chains when called.</p></li>
-<li><p><strong>GetASK(label)</strong>: Assuming ASK is enabled and initialized, returns the next key from the appropriate chain, and advances the appropriate ASK chain key, deleting the previous chain key.</p></li>
+<li><p><strong>InitASK(label)</strong>: Initializes a chain for the given label.</p></li>
+<li><p><strong>GetASK(label)</strong>: Assuming that a chain has been initialized for the label this method returns the next key from the appropriate chain and advances the chain to enable forward secrecy for ASK outputs.</p></li>
 </ul>
 <h1 id="security-considerations">3. Security considerations</h1>
 <p>The Additional Symmetric Keys extension is design to meet the following security goals:</p>
 <ul>
 <li><p>The ASKs should be independent from the Noise chaining key. Recovering knowledge about the Noise chaining key from any number of ASK outputs must be infeasible.</p></li>
 <li><p>The ASKs should be mutual independent; deriving any of the ASK outputs from any other should be infeasible.</p></li>
-<li><p>ASKs should be capable of serving as collision-resistant hashes of the session transcript at the security level expected by the employed hash function (256/512-bit).</p></li>
+<li><p>ASKs output should be capable of serving as collision resistant hashes of the session transcript at the security level expected by the employed hash function (256/512-bit). Since the GetASK method only outputs 256-bit, we require that the concatenation of two GetASK outputs (from the same or distinct chains) offer the same level of collision resistance as the underlying hash function.</p></li>
 </ul>
 <h1 id="design">4. Design</h1>
 <p>In addition to the security goals stated above, the extension seeks to meet the following design goals:</p>
 <ul>
 <li><p>The mechanism should not be restricted to using the output key-material for particular purposes (e.g. the use cases listed above).</p></li>
-<li><p>When not enabled, the ASK mechanism should incur no additional computational cost. This allows libraries to implement the extension without introducing significant overhead on applications not using the ASK API.</p></li>
+<li><p>When not used, the ASK mechanism should incur any significant additional computational cost. This allows libraries to implement the extension without introducing significant overhead on applications not using this extension.</p></li>
 </ul>
 <h1 id="implementation">5. Implementation</h1>
-<h1 id="ipr">6. IPR</h1>
+<p>Implementation of ASK uses HKDF <span class="citation">[<a href="#ref-rfc5869">1</a>]</span> and augments the operation of <strong>MixKey</strong>, <strong>MixHash</strong> and <strong>MixKeyAndHash</strong> by clearing the chains whenever the <code>SymmetricState</code> object are updated: after any call to either <strong>MixKey</strong>, <strong>MixHash</strong> or <strong>MixKeyAndHash</strong>, set <code>ask_chains = {}</code> (empty mapping).</p>
+<p>The API is implemented as follows:</p>
+<ul>
+<li><strong>InitASK(label)</strong>:
+<ul>
+<li>If <code>ask_chains</code> contains <code>label</code>:<br />
+Return an appropriate error</li>
+<li>Set <code>ask_chains[label] = HKDF(ck, h || label, info=&quot;ask&quot;)</code></li>
+<li>Return <code>tmp_k2</code></li>
+</ul></li>
+<li><p><strong>GetASK(label)</strong>:</p>
+<ul>
+<li>If <code>ask_chains</code> does not contain <code>label</code>:<br />
+Return an appropriate error</li>
+<li>Let <code>ask_ck = ask_chains[label]</code></li>
+<li>Let <code>temp_k1, temp_k2 = HKDF(ask_ck, zerolen, 2)</code></li>
+<li>Set <code>ask_chains[label] = temp_k1</code></li>
+<li>Return <code>temp_k2[..32]</code>, the first 32-bytes of <code>temp_k2</code>.</li>
+</ul></li>
+</ul>
+<h1 id="rational">6. Rational</h1>
+<p>Although <code>GetASK(label)</code> and <code>InitASK(label)</code> could be combined, these are kept separate to enable the common use case where a chain is initialized before a <code>Split()</code> call (when <code>ck</code> is still available) and used after the <code>CipherState</code> objects have been instantiated.</p>
+<p>The output of <code>GetASK</code> is truncated to 32 bytes to ensure that the API has the same behavior regardless of which hash function is employed.</p>
+<h1 id="ipr">7. IPR</h1>
 <p>This document is hereby placed in the public domain.</p>
-<h1 id="acknowledgements">7. Acknowledgements</h1>
+<h1 id="acknowledgements">8. Acknowledgements</h1>
 <p>This extension is based on the &quot;Resumption PSKs&quot; discussion between:</p>
 <ul>
 <li>str4d (str4d@i2pmail.org)</li>
@@ -72,7 +93,12 @@
 <li>Christopher Wood (christopherwood07@gmail.com)</li>
 <li>David Wong (davidwong.crypto@gmail.com)</li>
 </ul>
-<p>And in particular the <a href="https://moderncrypto.org/mail-archive/noise/2018/001713.html">ASK proposal outlined by Trevor Perrin</a>. From which both terminology and implementation details has been lifted into this document.</p>
-<h1 id="references">8. References</h1>
+<p>And in particular the ASK proposal outlined by Trevor Perrin from which both terminology and implementation details has been lifted into this document.</p>
+<h1 id="references" class="unnumbered">9. References</h1>
+<div id="refs" class="references">
+<div id="ref-rfc5869">
+<p>[1] H. Krawczyk and P. Eronen, “HMAC-based Extract-and-Expand Key Derivation Function (HKDF).” RFC 5869 (Informational); RFC Editor, May-2010. <a href="https://www.rfc-editor.org/rfc/rfc5869.txt" class="uri">https://www.rfc-editor.org/rfc/rfc5869.txt</a></p>
+</div>
+</div>
 </body>
 </html>
