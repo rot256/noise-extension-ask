@@ -60,7 +60,7 @@
 <li><p>When not used, the ASK mechanism should incur any significant additional computational cost. This allows libraries to implement the extension without introducing significant overhead on applications not using this extension.</p></li>
 </ul>
 <h1 id="implementation">5. Implementation</h1>
-<p>Implementation of ASK uses HKDF <span class="citation">[<a href="#ref-rfc5869">1</a>]</span> and augments the operation of <strong>MixKey</strong>, <strong>MixHash</strong> and <strong>MixKeyAndHash</strong> by clearing the chains whenever the <code>SymmetricState</code> object are updated: after any call to either <strong>MixKey</strong>, <strong>MixHash</strong> or <strong>MixKeyAndHash</strong>, set <code>ask_chains = {}</code> (empty mapping).</p>
+<p>Implementation of ASK uses HKDF <span class="citation">[<a href="#ref-rfc5869">1</a>]</span> and augments the operation of <strong>MixKey</strong> and <strong>MixKeyAndHash</strong> by clearing the chains whenever the <code>SymmetricState</code> object are updated: after any call to either <strong>MixKey</strong> or <strong>MixKeyAndHash</strong>, set <code>ask_chains = {}</code> (empty mapping).</p>
 <p>The API is implemented as follows:</p>
 <ul>
 <li><strong>InitASK(label)</strong>:

@@ -74,9 +74,9 @@ In addition to the security goals stated above, the extension seeks to meet the 
 # 5. Implementation
 
 Implementation of ASK uses HKDF [@rfc5869]
-and augments the operation of **MixKey**, **MixHash** and **MixKeyAndHash**
+and augments the operation of **MixKey** and **MixKeyAndHash**
 by clearing the chains whenever the `SymmetricState` object are updated:
-after any call to either **MixKey**, **MixHash** or **MixKeyAndHash**,
+after any call to either **MixKey** or **MixKeyAndHash**,
 set `ask_chains = {}` (empty mapping).
 
 The API is implemented as follows:
