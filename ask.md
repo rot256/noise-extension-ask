@@ -96,7 +96,7 @@ The API is implemented as follows:
     * Set `ask_chains[label] = temp_k1`
     * Return `temp_k2[..32]`, the first 32-bytes of `temp_k2`.
 
-# 6. Rational
+# 6. Rationale
 
 Although `GetASK(label)` and `InitASK(label)` could be combined,
 these are kept separate to enable the common use case where a chain is initialized
