@@ -1,7 +1,7 @@
 ---
 title:      'Additional Symmetric Keys'
 author:
- - Mathias hall-Andersen (mathias@hall-andersen.dk)
+ - Mathias Hall-Andersen (mathias@hall-andersen.dk)
 revision:   '1'
 status:     'unofficial/unstable'
 date:       '2018-07-11'
@@ -55,6 +55,10 @@ The Additional Symmetric Keys extension is design to meet the following security
 * The ASKs should be mutual independent;
   deriving any of the ASK outputs from any other should be infeasible.
 
+* Forward secrecy:
+  It should not be possible to derive prior ASK outputs from the current chain state.
+  This assumes that `ck` has been updated since initialization of the chain.
+
 * ASKs output should be capable of serving as collision resistant hashes of the session transcript
   at the security level expected by the employed hash function (256/512-bit).
   Since the GetASK method only outputs 256-bit, we require that the concatenation of two GetASK outputs
@@ -85,7 +89,6 @@ The API is implemented as follows:
     * If `ask_chains` contains `label`: \
       Return an appropriate error
     * Set `ask_chains[label] = HKDF(ck, h || label, info="ask")`
-    * Return `tmp_k2`
 
 * **GetASK(label)**:
 

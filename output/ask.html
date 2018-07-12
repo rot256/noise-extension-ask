@@ -4,7 +4,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta http-equiv="Content-Style-Type" content="text/css" />
   <meta name="generator" content="pandoc" />
-  <meta name="author" content="Mathias hall-Andersen (mathias@hall-andersen.dk)" />
+  <meta name="author" content="Mathias Hall-Andersen (mathias@hall-andersen.dk)" />
   <meta name="date" content="2018-07-11" />
   <title>Additional Symmetric Keys</title>
   <style type="text/css">code{white-space: pre;}</style>
@@ -13,7 +13,7 @@
 <body>
 <div id="header">
 <h1 class="title">Additional Symmetric Keys</h1>
-<b>Author:</b> Mathias hall-Andersen (mathias@hall-andersen.dk)<br/>
+<b>Author:</b> Mathias Hall-Andersen (mathias@hall-andersen.dk)<br/>
 <b>Revision:</b> 1<br/>
 <b>Date:</b> 2018-07-11<br/>
 <b>Status:</b> unofficial/unstable<br/>
@@ -27,7 +27,7 @@
 <li><a href="#security-considerations">3. Security considerations</a></li>
 <li><a href="#design">4. Design</a></li>
 <li><a href="#implementation">5. Implementation</a></li>
-<li><a href="#rational">6. Rational</a></li>
+<li><a href="#rationale">6. Rationale</a></li>
 <li><a href="#ipr">7. IPR</a></li>
 <li><a href="#acknowledgements">8. Acknowledgements</a></li>
 <li><a href="#references">9. References</a></li>
@@ -51,6 +51,7 @@
 <ul>
 <li><p>The ASKs should be independent from the Noise chaining key. Recovering knowledge about the Noise chaining key from any number of ASK outputs must be infeasible.</p></li>
 <li><p>The ASKs should be mutual independent; deriving any of the ASK outputs from any other should be infeasible.</p></li>
+<li><p>Forward secrecy: It should not be possible to derive prior ASK outputs from the current chain state. This assumes that <code>ck</code> has been updated since initialization of the chain.</p></li>
 <li><p>ASKs output should be capable of serving as collision resistant hashes of the session transcript at the security level expected by the employed hash function (256/512-bit). Since the GetASK method only outputs 256-bit, we require that the concatenation of two GetASK outputs (from the same or distinct chains) offer the same level of collision resistance as the underlying hash function.</p></li>
 </ul>
 <h1 id="design">4. Design</h1>
@@ -68,7 +69,6 @@
 <li>If <code>ask_chains</code> contains <code>label</code>:<br />
 Return an appropriate error</li>
 <li>Set <code>ask_chains[label] = HKDF(ck, h || label, info=&quot;ask&quot;)</code></li>
-<li>Return <code>tmp_k2</code></li>
 </ul></li>
 <li><p><strong>GetASK(label)</strong>:</p>
 <ul>
@@ -80,7 +80,7 @@ Return an appropriate error</li>
 <li>Return <code>temp_k2[..32]</code>, the first 32-bytes of <code>temp_k2</code>.</li>
 </ul></li>
 </ul>
-<h1 id="rational">6. Rational</h1>
+<h1 id="rationale">6. Rationale</h1>
 <p>Although <code>GetASK(label)</code> and <code>InitASK(label)</code> could be combined, these are kept separate to enable the common use case where a chain is initialized before a <code>Split()</code> call (when <code>ck</code> is still available) and used after the <code>CipherState</code> objects have been instantiated.</p>
 <p>The output of <code>GetASK</code> is truncated to 32 bytes to ensure that the API has the same behavior regardless of which hash function is employed.</p>
 <h1 id="ipr">7. IPR</h1>
